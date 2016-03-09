@@ -93,11 +93,22 @@ class DateTimePicker(DateTimeInput):
                 var callback = function() {
                     $(function(){$("#%(picker_id)s:has(input:not([readonly],[disabled]))").datetimepicker(%(options)s);});
                 };
-                if(window.addEventListener)
+                // if window object id loaded already, call directly callback function
+                if (-1 != $.inArray(
+                        document.readyState,
+                        ["loaded", "interactive", "complete"]
+                    )
+                ) {
+                    callback();
+                } 
+                else if (window.addEventListener) {
                     window.addEventListener("load", callback, false);
-                else if (window.attachEvent)
+                }
+                else if (window.attachEvent) {
                     window.attachEvent("onload", callback);
-                else window.onload = callback;
+                }
+                else
+                    window.onload = callback;
             })(window);
         </script>'''
 
