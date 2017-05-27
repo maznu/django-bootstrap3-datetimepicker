@@ -125,7 +125,7 @@ class DateTimePicker(DateTimeInput):
     def render(self, name, value, attrs=None):
         if value is None:
             value = ''
-        input_attrs = self.build_attrs(attrs, type=self.input_type, name=name)
+        input_attrs = self.build_attrs(self.attrs, type=self.input_type, name=name)
         if value != '':
             # Only add the 'value' attribute if a value is non-empty.
             input_attrs['value'] = force_text(self._format_value(value))
@@ -146,4 +146,12 @@ class DateTimePicker(DateTimeInput):
             js = self.js_template % dict(picker_id=picker_id,
                                          options=json.dumps(self.options or {}))
         return mark_safe(force_text(html + js))
+
+    def build_attrs(self, base_attrs, extra_attrs=None, **kwargs):
+        # compatibility for Django >= 1.11
+        attrs = dict(base_attrs, **kwargs)
+
+        if extra_attrs:
+            attrs.update(extra_attrs)
+        return attrs
 
