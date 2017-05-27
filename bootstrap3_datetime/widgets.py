@@ -41,6 +41,16 @@ class DateTimePicker(DateTimeInput):
                         'zh-cn': 'zh-CN',
                         'zh-tw': 'zh-TW',
                         'zh-hk': 'zh-TW',
+
+                        # Currently, fallback for the following key
+                        # are not enabled in moment-with-locales.(min).js.
+                        # see https://github.com/moment/moment/issues/3099#issuecomment-247198464
+                        # So we have to do the fallback here.
+                        'zh-hans': 'zh-CN',
+                        'zh-hant': 'zh-TW',
+                        'zh-sg': 'zh-CN',
+                        'zh-mo': 'zh-TW',
+                        'zh-my': 'zh-CN'
                     }
                     if len(lang) > 2:
                         lang = lang_map.get(lang, 'en-us')
