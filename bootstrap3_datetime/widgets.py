@@ -101,7 +101,7 @@ class DateTimePicker(DateTimeInput):
         <script>
             (function(window) {
                 var callback = function() {
-                    $(function(){$("#%(picker_id)s").datetimepicker(%(options)s);});
+                    $(function(){$("#%(picker_id)s:has(input:not([readonly],[disabled]))").datetimepicker(%(options)s);});
                 };
                 if(window.addEventListener)
                     window.addEventListener("load", callback, false);
@@ -141,7 +141,8 @@ class DateTimePicker(DateTimeInput):
             input_attrs['value'] = force_text(self._format_value(value))
         input_attrs = dict([(key, conditional_escape(val)) for key, val in input_attrs.items()])  # python2.6 compatible
         if not self.picker_id:
-            self.picker_id = input_attrs.get('id', '') + '_picker'
+             self.picker_id = (input_attrs.get('id', '') +
+                               '_pickers').replace(' ', '_')
         self.div_attrs['id'] = self.picker_id
         picker_id = conditional_escape(self.picker_id)
         div_attrs = dict(
@@ -150,11 +151,12 @@ class DateTimePicker(DateTimeInput):
         html = self.html_template % dict(div_attrs=flatatt(div_attrs),
                                          input_attrs=flatatt(input_attrs),
                                          icon_attrs=flatatt(icon_attrs))
-        if not self.options:
-            js = ''
-        else:
+        if self.options:
+            self.options['language'] = translation.get_language()
             js = self.js_template % dict(picker_id=picker_id,
                                          options=json.dumps(self.options or {}))
+        else:
+            js = ''
         return mark_safe(force_text(html + js))
 
     def build_attrs(self, base_attrs, extra_attrs=None, **kwargs):
@@ -164,4 +166,3 @@ class DateTimePicker(DateTimeInput):
         if extra_attrs:
             attrs.update(extra_attrs)
         return attrs
-
