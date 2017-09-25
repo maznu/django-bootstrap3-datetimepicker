@@ -21,41 +21,6 @@ class DateTimePicker(DateTimeInput):
             def __iter__(self):
                 yield 'bootstrap3_datetime/js/moment-with-locales.min.js'
                 yield 'bootstrap3_datetime/js/bootstrap-datetimepicker.min.js'
-                lang = translation.get_language()
-                if lang:
-                    lang = lang.lower()
-                    #There is language name that length>2 *or* contains uppercase.
-                    lang_map = {
-                        'ar-ma': 'ar-ma',
-                        'en-au': 'en-au',
-                        'en-ca': 'en-ca',
-                        'en-gb': 'en-gb',
-                        'en-us': 'en-us',
-                        'fa-ir': 'fa-ir',
-                        'fr-ca': 'fr-ca',
-                        'ms-my': 'ms-my',
-                        'pt-br': 'bt-BR',
-                        'rs-latin': 'rs-latin',
-                        'tzm-la': 'tzm-la',
-                        'tzm': 'tzm',
-                        'zh-cn': 'zh-CN',
-                        'zh-tw': 'zh-TW',
-                        'zh-hk': 'zh-TW',
-
-                        # Currently, fallback for the following key
-                        # are not enabled in moment-with-locales.(min).js.
-                        # see https://github.com/moment/moment/issues/3099#issuecomment-247198464
-                        # So we have to do the fallback here.
-                        'zh-hans': 'zh-CN',
-                        'zh-hant': 'zh-TW',
-                        'zh-sg': 'zh-CN',
-                        'zh-mo': 'zh-TW',
-                        'zh-my': 'zh-CN'
-                    }
-                    if len(lang) > 2:
-                        lang = lang_map.get(lang, 'en-us')
-                    if lang not in ('en', 'en-us'):
-                        yield 'bootstrap3_datetime/js/locales/bootstrap-datetimepicker.%s.js' % (lang)
 
         js = JsFiles()
         css = {'all': ('bootstrap3_datetime/css/bootstrap-datetimepicker.min.css',), }
@@ -135,10 +100,20 @@ class DateTimePicker(DateTimeInput):
     def render(self, name, value, attrs=None):
         if value is None:
             value = ''
-        input_attrs = self.build_attrs(self.attrs, type=self.input_type, name=name)
+
+        try:
+            # For django version < 1.11
+            input_attrs = self.build_attrs(attrs, type=self.input_type, name=name)
+        except TypeError:
+            # For django version >= 1.11
+            extra_attrs = {"type": self.input_type, "name": name}
+            if self.attrs:
+                extra_attrs.update(self.attrs)
+            input_attrs = self.build_attrs(attrs, extra_attrs=extra_attrs)
+
         if value != '':
             # Only add the 'value' attribute if a value is non-empty.
-            input_attrs['value'] = force_text(self._format_value(value))
+            input_attrs['value'] = force_text(self.format_value(value))
         input_attrs = dict([(key, conditional_escape(val)) for key, val in input_attrs.items()])  # python2.6 compatible
         if not self.picker_id:
              self.picker_id = (input_attrs.get('id', '') +
@@ -158,10 +133,13 @@ class DateTimePicker(DateTimeInput):
             js = ''
         return mark_safe(force_text(html + js))
 
-    def build_attrs(self, base_attrs, extra_attrs=None, **kwargs):
-        # compatibility for Django >= 1.11
-        attrs = dict(base_attrs, **kwargs)
-
-        if extra_attrs:
-            attrs.update(extra_attrs)
-        return attrs
+    def format_value(self, value):
+        """
+        The private API ``Widget._format_value()`` is made public and renamed to
+        :meth:`~django.forms.Widget.format_value`.The old name will work until
+        Django 2.0.
+        """
+        try:
+            return super(DateTimePicker, self).format_value(value)
+        except AttributeError:
+            return super(DateTimePicker, self)._format_value(value)
