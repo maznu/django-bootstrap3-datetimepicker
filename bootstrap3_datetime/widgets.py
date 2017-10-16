@@ -15,6 +15,47 @@ except ImportError:  # python3
     from django.utils.encoding import force_text
 
 
+def get_momentjs_supported_locale():
+    # List of moment.js supported locales:
+    # https://github.com/moment/moment/blob/develop/component.json
+
+    # List of django supported languages:
+    # from django.conf.locale import LANG_INFO
+    # print(list(LANG_INFO.keys()))
+
+    # Get the language code
+    lang = translation.get_language().lower()
+    if lang in ('en', 'en-us'):
+        return
+
+    # These are known langs which don't supported by moment.js (while supported by
+    # Django. Use contrib/get_fallback_and_unsupported_locale_name.py to generate
+    # this list
+    not_supported_list = [
+        'ast', 'dsb', 'ga', 'hsb', 'ia', 'io', 'mn', 'no',
+        'os', 'pa', 'sr-latn', 'tt', 'udm']
+    if lang in not_supported_list:
+        return
+
+    known_fallbacks = {
+        # For Chinese
+        'zh-hans': "zh-cn",
+        'zh-my': "zh-cn",
+        'zh-sg': "zh-cn",
+        'zh-hant': "zh-tw",  # or 'zh-hk'
+        'zh-mo': "zh-tw",
+
+        # For Spanish
+        'es-ar': "es",
+        'es-co': "es",
+        'es-mx': "es",
+        'es-ni': "es",
+        'es-ve': "es",
+    }
+
+    return known_fallbacks.get(lang) or lang
+
+
 class DateTimePicker(DateTimeInput):
     class Media:
         class JsFiles(object):
@@ -93,7 +134,9 @@ class DateTimePicker(DateTimeInput):
             self.options = False
         else:
             self.options = options and options.copy() or {}
-            self.options['locale'] = translation.get_language()
+            lang = get_momentjs_supported_locale()
+            if lang:
+                self.options['locale'] = lang
             if format and not self.options.get('format') and not self.attrs.get('date-format'):
                 self.options['format'] = self.conv_datetime_format_py2js(format)
 
