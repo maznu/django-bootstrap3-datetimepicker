@@ -24,7 +24,10 @@ def get_momentjs_supported_locale():
     # print(list(LANG_INFO.keys()))
 
     # Get the language code
-    lang = translation.get_language().lower()
+    lang = translation.get_language()
+    if lang is None:
+        return
+    lang = lang.lower()
     if lang in ('en', 'en-us'):
         return
 
