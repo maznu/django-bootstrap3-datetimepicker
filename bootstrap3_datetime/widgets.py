@@ -61,12 +61,8 @@ def get_momentjs_supported_locale():
 
 class DateTimePicker(DateTimeInput):
     class Media:
-        class JsFiles(object):
-            def __iter__(self):
-                yield 'bootstrap3_datetime/js/moment-with-locales.min.js'
-                yield 'bootstrap3_datetime/js/bootstrap-datetimepicker.min.js'
-
-        js = JsFiles()
+        js = ('bootstrap3_datetime/js/moment-with-locales.min.js',
+              'bootstrap3_datetime/js/bootstrap-datetimepicker.min.js')
         css = {'all': ('bootstrap3_datetime/css/bootstrap-datetimepicker.min.css',), }
 
     # http://momentjs.com/docs/#/parsing/string-format/
