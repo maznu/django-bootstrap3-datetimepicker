@@ -18,39 +18,54 @@ except ImportError:  # python3
     from django.utils.encoding import force_text
 
 
+def get_momentjs_supported_locale():
+    # List of moment.js supported locales:
+    # https://github.com/moment/moment/blob/develop/component.json
+
+    # List of django supported languages:
+    # from django.conf.locale import LANG_INFO
+    # print(list(LANG_INFO.keys()))
+
+    # Get the language code
+    lang = translation.get_language()
+    if lang is None:
+        return
+    lang = lang.lower()
+    if lang in ('en', 'en-us'):
+        return
+
+    # These are known langs which don't supported by moment.js (while supported by
+    # Django. Use contrib/get_fallback_and_unsupported_locale_name.py to generate
+    # this list
+    not_supported_list = [
+        'ast', 'dsb', 'ga', 'hsb', 'ia', 'io', 'mn', 'no',
+        'os', 'pa', 'sr-latn', 'tt', 'udm']
+    if lang in not_supported_list:
+        return
+
+    known_fallbacks = {
+        # For Chinese
+        'zh-hans': "zh-cn",
+        'zh-my': "zh-cn",
+        'zh-sg': "zh-cn",
+        'zh-hant': "zh-tw",  # or 'zh-hk'
+        'zh-mo': "zh-tw",
+
+        # For Spanish
+        'es-ar': "es",
+        'es-co': "es",
+        'es-mx': "es",
+        'es-ni': "es",
+        'es-ve': "es",
+    }
+
+    return known_fallbacks.get(lang) or lang
+
+
 class DateTimePicker(DateTimeInput):
     class Media:
-        class JsFiles(object):
-            def __iter__(self):
-                yield 'bootstrap3_datetime/js/moment.min.js'
-                yield 'bootstrap3_datetime/js/bootstrap-datetimepicker.min.js'
-                lang = translation.get_language()
-                if lang:
-                    lang = lang.lower()
-                    #There is language name that length>2 *or* contains uppercase.
-                    lang_map = {
-                        'ar-ma': 'ar-ma',
-                        'en-au': 'en-au',
-                        'en-ca': 'en-ca',
-                        'en-gb': 'en-gb',
-                        'en-us': 'en-us',
-                        'fa-ir': 'fa-ir',
-                        'fr-ca': 'fr-ca',
-                        'ms-my': 'ms-my',
-                        'pt-br': 'bt-BR',
-                        'rs-latin': 'rs-latin',
-                        'tzm-la': 'tzm-la',
-                        'tzm': 'tzm',
-                        'zh-cn': 'zh-CN',
-                        'zh-tw': 'zh-TW',
-                        'zh-hk': 'zh-TW',
-                    }
-                    if len(lang) > 2:
-                        lang = lang_map.get(lang, 'en-us')
-                    if lang not in ('en', 'en-us'):
-                        yield 'bootstrap3_datetime/js/locales/bootstrap-datetimepicker.%s.js' % (lang)
-
-        js = JsFiles()
+        js = ('bootstrap3_datetime/js/moment-with-locales.min.js',
+              'bootstrap3_datetime/js/bootstrap-datetimepicker.min.js')
         css = {'all': ('bootstrap3_datetime/css/bootstrap-datetimepicker.min.css',), }
 
     # http://momentjs.com/docs/#/parsing/string-format/
@@ -96,11 +111,22 @@ class DateTimePicker(DateTimeInput):
                 var callback = function() {
                     $(function(){$("#%(picker_id)s:has(input:not([readonly],[disabled]))").datetimepicker(%(options)s);});
                 };
-                if(window.addEventListener)
+                // if window object id loaded already, call directly callback function
+                if (-1 != $.inArray(
+                        document.readyState,
+                        ["loaded", "interactive", "complete"]
+                    )
+                ) {
+                    callback();
+                } 
+                else if (window.addEventListener) {
                     window.addEventListener("load", callback, false);
-                else if (window.attachEvent)
+                }
+                else if (window.attachEvent) {
                     window.attachEvent("onload", callback);
-                else window.onload = callback;
+                }
+                else
+                    window.onload = callback;
             })(window);
         </script>'''
 
@@ -121,16 +147,28 @@ class DateTimePicker(DateTimeInput):
             self.options = False
         else:
             self.options = options and options.copy() or {}
+            lang = get_momentjs_supported_locale()
+            if lang:
+                self.options['locale'] = lang
             if format and not self.options.get('format') and not self.attrs.get('date-format'):
                 self.options['format'] = self.conv_datetime_format_py2js(format)
 
     def render(self, name, value, attrs=None):
         if value is None:
             value = ''
-        input_attrs = self.build_attrs(self.attrs, attrs, type=self.input_type, name=name)
+        try:
+            # For django version < 1.11
+            input_attrs = self.build_attrs(attrs, type=self.input_type, name=name)
+        except TypeError:
+            # For django version >= 1.11
+            extra_attrs = {"type": self.input_type, "name": name}
+            if self.attrs:
+                extra_attrs.update(self.attrs)
+            input_attrs = self.build_attrs(attrs, extra_attrs=extra_attrs)
+
         if value != '':
             # Only add the 'value' attribute if a value is non-empty.
-            input_attrs['value'] = force_text(self._format_value(value))
+            input_attrs['value'] = force_text(self.format_value(value))
         input_attrs = dict([(key, conditional_escape(val)) for key, val in input_attrs.items()])  # python2.6 compatible
         if not self.picker_id:
              self.picker_id = (input_attrs.get('id', '') +
@@ -144,15 +182,25 @@ class DateTimePicker(DateTimeInput):
                                          input_attrs=flatatt(input_attrs),
                                          icon_attrs=flatatt(icon_attrs))
         if self.options:
-            self.options['language'] = translation.get_language()
             js = self.js_template % dict(picker_id=picker_id,
                                          options=json.dumps(self.options or {}))
         else:
             js = ''
         return mark_safe(force_text(html + js))
 
-    def build_attrs(self, base_attrs, extra_attrs=None, **kwargs):
-        attrs = dict(base_attrs, **kwargs)
-        if extra_attrs:
-            attrs.update(extra_attrs)
-        return attrs
+    #def build_attrs(self, base_attrs, extra_attrs=None, **kwargs):
+    #    attrs = dict(base_attrs, **kwargs)
+    #    if extra_attrs:
+    #        attrs.update(extra_attrs)
+    #    return attrs
+
+    def format_value(self, value):
+        """
+        The private API ``Widget._format_value()`` is made public and renamed to
+        :meth:`~django.forms.Widget.format_value`.The old name will work until
+        Django 2.0.
+        """
+        try:
+            return super(DateTimePicker, self).format_value(value)
+        except AttributeError:
+            return super(DateTimePicker, self)._format_value(value)
